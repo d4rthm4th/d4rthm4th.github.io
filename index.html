@@ -1,9 +1,237 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>content</title>
+  <title>With love - to Marina</title>
 </head>
 <body>
   <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width = window.innerWidth;
+    const height = canvas.height = window.innerHeight;
+
+    function mergeSort(A, index) {
+      const n = A.length;
+      if (n === 1) {
+        return A;
+      }
+      const l1 = mergeSort(A.slice(0, n / 2), index);
+      const l2 = mergeSort(A.slice(n / 2), index);
+      const C = [];
+      while (l1.length !== 0 && l2.length !== 0) {
+        if (l1[0][index] > l2[0][index]) {
+          C.push(l2.shift());
+        } else {
+          C.push(l1.shift());
+        }
+      }
+      while (l1.length !== 0) {
+        C.push(l1.shift());
+      }
+      while (l2.length !== 0) {
+        C.push(l2.shift());
+      }
+      return C;
+    }
+
+    class Poliedro {
+      constructor(vertices, faces, cores, O) {
+        this.vertices = vertices;
+        this.faces = faces;
+        this.cores = cores;
+        this.O = O;
+        this.normais = [];
+        for (const face of faces) {
+          const [vertex1, vertex2, vertex3] = face;
+          const [x1, y1, z1] = vertices[vertex1];
+          const [x2, y2, z2] = vertices[vertex2];
+          const [x3, y3, z3] = vertices[vertex3];
+
+          const u = [x2 - x1, y2 - y1, z2 - z1];
+          const v = [x3 - x1, y3 - y1, z3 - z1];
+
+          const norma_u = Math.sqrt(u[0] ** 2 + u[1] ** 2 + u[2] ** 2);
+          const norma_v = Math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2);
+
+          const a = u[0] / norma_u, b = u[1] / norma_u, c = u[2] / norma_u;
+          const d = v[0] / norma_v, e = v[1] / norma_v, f = v[2] / norma_v;
+
+          const normal = [b * f - c * e, c * d - a * f, a * e - b * d];
+          this.normais.push(normal);
+        }
+      }
+
+      transladar(vetor) {
+        const [a, b, c] = vetor;
+        for (let i = 0; i < this.vertices.length; i++) {
+          const [x, y, z] = this.vertices[i];
+          this.vertices[i] = [x + a, y + b, z + c];
+        }
+        const [x, y, z] = this.O;
+        this.O = [x + a, y + b, z + c];
+      }
+
+      rotacionar(a, b, ponto = null) {
+        const cosa = Math.cos(a), sina = Math.sin(a);
+        const cosb = Math.cos(b), sinb = Math.sin(b);
+        const cosasinb = cosa * sinb;
+        const sinasinb = sina * sinb;
+        const cosacosb = cosa * cosb;
+        const sinacosb = sina * cosb;
+
+        const [A, B, C] = ponto !== null ? ponto : this.O;
+
+        for (let i = 0; i < this.vertices.length; i++) {
+          const [x, y, z] = this.vertices[i];
+          const nx = x - A, ny = y - B, nz = z - C;
+
+          const rotatedX = nx * cosb + nz * cosasinb - ny * sinasinb;
+          const rotatedY = ny * cosa + nz * sina;
+          const rotatedZ = nz * cosacosb - ny * sinacosb - nx * sinb;
+
+          this.vertices[i] = [rotatedX + A, rotatedY + B, rotatedZ + C];
+        }
+
+        for (let i = 0; i < this.normais.length; i++) {
+          const [x, y, z] = this.normais[i];
+          const nx = x * cosb + z * cosasinb - y * sinasinb;
+          const ny = y * cosa + z * sina;
+          const nz = z * cosacosb - y * sinacosb - x * sinb;
+
+          this.normais[i] = [nx, ny, nz];
+        }
+      }
+
+      exportar(focoluz = [0, 0, 1]) {
+        //poligonos = [[poligono, cor, zmin]]
+        const poligonos = [];
+        const [lx, ly, lz] = focoluz;
+        for (let i = 0; i < this.faces.length; i++) {
+          const [nx, ny, nz] = this.normais[i];
+          let ilum = nx * lx + ny * ly + nz * lz;
+          if (ilum >= 0) {
+            ilum = Math.sqrt(ilum);
+            const face = this.faces[i];
+            const zs = [];
+            const [cx, cy, cz] = this.cores[i];
+            const cor = [ilum * cx, ilum * cy, ilum * cz];
+            const poligono = [];
+            for (const j of face) {
+              const [x, y, z] = this.vertices[j];
+              const ix = Math.floor(x), iy = Math.floor(y);
+              zs.push(z);
+              poligono.push([ix, iy]);
+            }
+            const z = Math.min(...zs);
+            poligonos.push([poligono, cor, z]);
+          } else {
+            const face = this.faces[i];
+            const zs = [];
+            const cor = [0, 0, 0];
+            const poligono = [];
+            for (const j of face) {
+              const [x, y, z] = this.vertices[j];
+              const ix = Math.floor(x), iy = Math.floor(y);
+              zs.push(z);
+              poligono.push([ix, iy]);
+            }
+            const z = Math.min(...zs);
+            poligonos.push([poligono, cor, z]);
+          }
+        }
+        return poligonos;
+      }
+    }
+
+    function heart(O, r, m = 36, n = 36) {
+      const vertices = [];
+      const faces = [];
+
+      for (let j = 0; j <= n; j++) {
+        const phi = (2 * j * Math.PI) / n;
+        const cosphi = Math.cos(phi);
+        const sinphi = Math.sin(phi);
+
+        for (let i = 0; i < m; i++) {
+          const theta = (i * Math.PI) / m;
+          const costheta = Math.cos(theta);
+          const sintheta = Math.sin(theta);
+
+          let x = r * costheta;
+          let y = r * sintheta * cosphi;
+          let z = r * sintheta * sinphi;
+
+          x = x;
+          y = 4.5*15/r + r/10 * y - Math.abs(x) * ((r*20/15 - Math.abs(x)) / r) ** 0.5;
+          x *= 2 - z / r;
+
+          vertices.push([O[0] + 12 * x, O[1] + 12 * y, O[2] + 12 * z]);
+        }
+      }
+
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < m; i++) {
+          const p0 = i + j * m;
+          const p1 = (i + 1) % m + j * m;
+          const p2 = (i + 1) % m + (j + 1) * m;
+          const p3 = i + (j + 1) * m;
+
+          faces.push([p0, p1, p2]);
+          faces.push([p0, p2, p3]);
+        }
+      }
+
+      const cores = Array.from({ length: faces.length }, () => [172, 33, 230]);
+
+      return new Poliedro(vertices, faces, cores, O);
+    }
+
+    const poliedro = heart([width / 2, height / 2, 0], 15);
+    poliedro.rotacionar(0, Math.PI);
+    let a_x = 0;
+    let a_y = 0;
+    let v_x = 0.005;
+    let v_y = 0.01;
+
+    function draw() {
+      requestAnimationFrame(draw);
+
+      poliedro.rotacionar(0, -a_y);
+      poliedro.rotacionar(v_x, 0);
+      poliedro.rotacionar(0, a_y);
+      poliedro.rotacionar(0, v_y);
+      a_x += v_x;
+      a_y += v_y;
+
+      if (!(-Math.PI / 6 < a_x && a_x < Math.PI / 6)) {
+        v_x *= -1;
+      }
+      if (!(-Math.PI / 4 < a_y && a_y < Math.PI / 4)) {
+        v_y *= -1;
+      }
+
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, width, height);
+
+      const poligonos = poliedro.exportar();
+      for (const poligono of mergeSort(poligonos, 2)) {
+        const cor = poligono[1];
+        const vertices = poligono[0];
+
+        ctx.beginPath();
+        ctx.moveTo(vertices[0][0], vertices[0][1]);
+        for (const vertice of vertices) {
+          ctx.lineTo(vertice[0], vertice[1]);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgb(${cor[0]}, ${cor[1]}, ${cor[2]})`;
+        ctx.fill();
+      }
+    }
+
+    draw();
+  </script>
 </body>
 </html>
